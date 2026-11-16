@@ -81,4 +81,4 @@ def work():
 def metrics():
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
-# touch to trigger first image build
+# retrigger after trivy-action version fix
