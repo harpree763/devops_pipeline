@@ -1,0 +1,6 @@
+apiVersion: v2
+name: golden-path-service
+description: Golden-path Helm chart for Safe Delivery Platform services — ships every service with canary rollout, observability (metrics, logs, dashboard) and a load generator by default.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

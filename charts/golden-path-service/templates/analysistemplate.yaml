@@ -1,0 +1,32 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: {{ .Values.name }}-health
+spec:
+  args:
+    - name: canary-hash
+  metrics:
+    - name: success-rate
+      interval: 15s
+      initialDelay: 30s
+      count: 4
+      failureLimit: 1
+      successCondition: "result[0] >= {{ .Values.canary.analysis.minSuccessRate }}"
+      provider:
+        prometheus:
+          address: {{ .Values.canary.analysis.prometheusAddress }}
+          query: |
+            sum(rate(http_requests_total{service="{{ .Values.name }}",path="/work",status!~"5..",rollouts_pod_template_hash="{{`{{args.canary-hash}}`}}"}[1m]))
+            /
+            sum(rate(http_requests_total{service="{{ .Values.name }}",path="/work",rollouts_pod_template_hash="{{`{{args.canary-hash}}`}}"}[1m]))
+    - name: p95-latency
+      interval: 15s
+      initialDelay: 30s
+      count: 4
+      failureLimit: 1
+      successCondition: "result[0] <= {{ .Values.canary.analysis.maxP95LatencySeconds }}"
+      provider:
+        prometheus:
+          address: {{ .Values.canary.analysis.prometheusAddress }}
+          query: |
+            histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{service="{{ .Values.name }}",path="/work",rollouts_pod_template_hash="{{`{{args.canary-hash}}`}}"}[1m])) by (le))

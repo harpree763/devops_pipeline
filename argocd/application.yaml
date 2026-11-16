@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: safe-delivery-platform
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/harpree763/devops_pipeline.git
+    targetRevision: main
+    path: charts/golden-path-service
+    helm:
+      valueFiles:
+        - ../../envs/dev/values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: demo
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

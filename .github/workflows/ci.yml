@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  pull_request:
+    paths:
+      - "app/**"
+      - "Dockerfile"
+      - "charts/**"
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "Dockerfile"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Lint & test (Python)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r app/requirements-dev.txt
+      - name: Ruff
+        run: ruff check app
+      - name: Pytest
+        working-directory: app
+        run: pytest -q
+
+  helm-lint:
+    name: Helm lint & template
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - name: helm lint
+        run: helm lint charts/golden-path-service -f envs/dev/values.yaml
+      - name: helm template
+        run: helm template demo charts/golden-path-service -f envs/dev/values.yaml
+
+  build-scan-push:
+    name: Build, scan, push image
+    runs-on: ubuntu-latest
+    needs: [test, helm-lint]
+    if: github.event_name == 'push'
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute image tag
+        id: vars
+        run: echo "tag=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Build image
+        run: docker build -t ghcr.io/${{ github.repository_owner }}/safe-delivery-platform:${{ steps.vars.outputs.tag }} .
+
+      - name: Trivy scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ghcr.io/${{ github.repository_owner }}/safe-delivery-platform:${{ steps.vars.outputs.tag }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push image
+        run: docker push ghcr.io/${{ github.repository_owner }}/safe-delivery-platform:${{ steps.vars.outputs.tag }}
+
+      - name: Update image tag in envs/dev/values.yaml
+        run: |
+          sed -i "s/^  tag:.*/  tag: \"${{ steps.vars.outputs.tag }}\"/" envs/dev/values.yaml
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add envs/dev/values.yaml
+          git commit -m "chore: bump image tag to ${{ steps.vars.outputs.tag }} [skip ci]"
+          git push

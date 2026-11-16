@@ -1,0 +1,36 @@
+{{- if .Values.loadGenerator.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.name }}-loadgen
+  labels:
+    app: {{ .Values.name }}-loadgen
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.name }}-loadgen
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.name }}-loadgen
+    spec:
+      containers:
+        - name: loadgen
+          image: curlimages/curl:8.11.1
+          command:
+            - /bin/sh
+            - -c
+            - |
+              while true; do
+                curl -s -o /dev/null http://{{ .Values.name }}/work || true
+                sleep {{ .Values.loadGenerator.intervalSeconds }}
+              done
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 50m
+              memory: 32Mi
+{{- end }}

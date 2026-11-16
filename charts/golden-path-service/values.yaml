@@ -1,0 +1,49 @@
+name: demo-service
+replicaCount: 4
+
+image:
+  repository: ghcr.io/harpree763/devops_pipeline
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+containerPort: 8000
+
+app:
+  version: "v1"
+  failRate: "0"
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi
+
+metrics:
+  enabled: true
+  path: /metrics
+  interval: 15s
+
+dashboard:
+  enabled: true
+
+canary:
+  analysis:
+    prometheusAddress: http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090
+    minSuccessRate: 0.95
+    maxP95LatencySeconds: 0.5
+  steps:
+    - setWeight: 25
+    - pause:
+        duration: 30s
+    - analysis: true
+    - setWeight: 50
+    - pause:
+        duration: 30s
+    - analysis: true
+    - setWeight: 100
+
+loadGenerator:
+  enabled: true
+  intervalSeconds: 1

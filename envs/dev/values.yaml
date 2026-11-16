@@ -1,0 +1,7 @@
+image:
+  repository: ghcr.io/harpree763/devops_pipeline
+  tag: "dev"
+
+app:
+  version: "v1"
+  failRate: "0"
